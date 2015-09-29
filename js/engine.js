@@ -1,3 +1,10 @@
+/*jshint globalstrict: true*/
+/*global gameState */
+/*global player */
+/*global Resources */
+/*global allEnemies */
+"use strict";
+
 /* Engine.js
  * This file provides the game loop functionality (update entities and render),
  * draws the initial game board on the screen, and then calls the update and
@@ -13,7 +20,6 @@
  * the canvas' context (ctx) object globally available to make writing app.js
  * a little simpler to work with.
  */
-
 var Engine = (function(global) {
     /* Predefine the variables we'll be using within this scope,
      * create the canvas element, grab the 2D context for that canvas
@@ -26,21 +32,88 @@ var Engine = (function(global) {
         lastTime;
 
     canvas.width = 505;
-    canvas.height = 606;
+    canvas.height = 750;
     doc.body.appendChild(canvas);
 
     /* This function serves as the kickoff point for the game loop itself
      * and handles properly calling the update and render methods.
      */
+
+     function statesman() {
+        //this little function hands control over to the part of our program
+        //that is supposed to have it at any given time by referring to
+        //the gamestate.currentstate value.
+
+        if(gameState.currentState === "pause"){
+            pause();
+        } else if (gameState.currentState === "main") {
+            main();
+        } else if (gameState.currentState === "startScreen") {
+            startScreen();
+        } else if (gameState.currentState === "playerLose") {
+            playerLose();
+        } else if (gameState.currentState === "playerWin") {
+            playerWin();
+        }
+     }
+
+    function pause() {
+        //we always call requestanimationframe and ask it to run the function, otherwise we blow the stack. We
+        //want to let the browser handle rendering, this is why we dont call the statesman() function ourselves.
+        render();
+        ctx.fillStyle = "white";
+        ctx.font = '29px sans-serif';
+        ctx.fillText("Paused", player.x, player.y + 100);
+        win.requestAnimationFrame(statesman);
+    }
+
+    function playerWin() {
+        player.scoreGain();
+        player.positionReset();
+        //Render is called once here to make sure the score change is reflected on the screen.
+        render();
+        //This line increases difficulty level of the game, effectively increasing enemy speeds.
+        gameState.difficulty += 1;
+        //Just a little visual flavor to help players recognise they won :)
+        ctx.drawImage(Resources.get('images/Star.png'), player.x, player.y);
+        //once we are done with the winning process, we set the state back to main, and hand control
+        //back over to statesman.
+        gameState.currentState = "main";
+        //Delays rendering for 500ms to prevent player being disoriented.
+        setTimeout(statesman, 500);
+    }
+
+    function playerLose() {
+        render();
+        ctx.fillStyle = "white";
+        ctx.font = '29px sans-serif';
+        ctx.fillText("Splat!", player.x, player.y + 100);
+        ctx.fillStyle = "white";
+        ctx.font = '39px sans-serif';
+        ctx.fillText("Press Space", player.x - 60, player.y + 129);
+        gameState.difficulty = 1;
+        player.scoreReset();
+        player.positionReset();
+        win.requestAnimationFrame(statesman);
+    }
+
+    function startScreen() {
+        //this renders the start screen, then asks the browser to render again when able.
+        ctx.drawImage(Resources.get('images/start-screen.png'), 0, 0);
+        win.requestAnimationFrame(statesman);
+    }
+
     function main() {
+
         /* Get our time delta information which is required if your game
          * requires smooth animation. Because everyone's computer processes
          * instructions at different speeds we need a constant value that
          * would be the same for everyone (regardless of how fast their
          * computer is) - hurray time!
          */
+
         var now = Date.now(),
-            dt = (now - lastTime) / 1000.0;
+            dt = ((now - lastTime) / 1000.0);
 
         /* Call our update/render functions, pass along the time delta to
          * our update function since it may be used for smooth animation.
@@ -56,7 +129,7 @@ var Engine = (function(global) {
         /* Use the browser's requestAnimationFrame function to call this
          * function again as soon as the browser is able to draw another frame.
          */
-        win.requestAnimationFrame(main);
+        win.requestAnimationFrame(statesman);
     }
 
     /* This function does some initial setup that should only occur once,
@@ -64,9 +137,10 @@ var Engine = (function(global) {
      * game loop.
      */
     function init() {
-        reset();
         lastTime = Date.now();
-        main();
+        //sets the state of the game to be the start screen, then passes control over to statesman.
+        gameState.currentState = "startScreen";
+        statesman();
     }
 
     /* This function is called by main (our game loop) and itself calls all
@@ -79,8 +153,8 @@ var Engine = (function(global) {
      * on the entities themselves within your app.js file).
      */
     function update(dt) {
-        updateEntities(dt);
-        // checkCollisions();
+            updateEntities(dt);
+            player.collisionCheck();
     }
 
     /* This is called by the update function  and loops through all of the
@@ -91,10 +165,10 @@ var Engine = (function(global) {
      * render methods.
      */
     function updateEntities(dt) {
+        player.update();
         allEnemies.forEach(function(enemy) {
             enemy.update(dt);
         });
-        player.update();
     }
 
     /* This function initially draws the "game level", it will then call
@@ -107,15 +181,18 @@ var Engine = (function(global) {
         /* This array holds the relative URL to the image used
          * for that particular row of the game level.
          */
+
         var rowImages = [
-                'images/water-block.png',   // Top row is water
-                'images/stone-block.png',   // Row 1 of 3 of stone
-                'images/stone-block.png',   // Row 2 of 3 of stone
-                'images/stone-block.png',   // Row 3 of 3 of stone
-                'images/grass-block.png',   // Row 1 of 2 of grass
-                'images/grass-block.png'    // Row 2 of 2 of grass
+                'images/water-block.png',
+                'images/stone-block.png',
+                'images/stone-block.png',
+                'images/grass-block.png',
+                'images/stone-block.png',
+                'images/stone-block.png',
+                'images/stone-block.png',
+                'images/grass-block.png'
             ],
-            numRows = 6,
+            numRows = 8,
             numCols = 5,
             row, col;
 
@@ -123,6 +200,12 @@ var Engine = (function(global) {
          * and, using the rowImages array, draw the correct image for that
          * portion of the "grid"
          */
+         //Makes sure the background is always black and doesnt receive bleed
+         //from other sprites
+        ctx.fillStyle = "black";
+        ctx.fillRect(0,0,505,755);
+
+        //draws the sprite tiles and generates the game board.
         for (row = 0; row < numRows; row++) {
             for (col = 0; col < numCols; col++) {
                 /* The drawImage function of the canvas' context element
@@ -136,8 +219,8 @@ var Engine = (function(global) {
             }
         }
 
-
         renderEntities();
+        player.drawScore();
     }
 
     /* This function is called by the render function and is called on each game
@@ -159,9 +242,6 @@ var Engine = (function(global) {
      * handle game reset states - maybe a new game menu or a game over screen
      * those sorts of things. It's only called once by the init() method.
      */
-    function reset() {
-        // noop
-    }
 
     /* Go ahead and load all of the images we know we're going to need to
      * draw our game level. Then set init as the callback method, so that when
@@ -172,13 +252,15 @@ var Engine = (function(global) {
         'images/water-block.png',
         'images/grass-block.png',
         'images/enemy-bug.png',
-        'images/char-boy.png'
+        'images/char-boy.png',
+        'images/start-screen.png',
+        'images/Star.png'
     ]);
     Resources.onReady(init);
-
     /* Assign the canvas' context object to the global variable (the window
-     * object when run in a browser) so that developer's can use it more easily
+     * object when run in a browser) so that developers can use it more easily
      * from within their app.js files.
      */
     global.ctx = ctx;
+
 })(this);
