@@ -4,6 +4,8 @@ Frogger Game clone, developed for Udacity's Front End Web Developer course's thi
 
 ## How to Play
 
+Click [here](http://hman1911.github.io/frontend-nanodegree-arcade-game/ "Frogger") to play right now.
+
 Simply execute index.html to run the game. See how high a score you can reach!
 
 ### Controls
